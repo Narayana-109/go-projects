@@ -80,7 +80,56 @@ func fetchTodos(w, http.ResponseWriter, r *http.Request){
 	rnd.JSON(w, http.StatusOk, renderer.M{
 		"data": todoList,
 	})
+}
 
+func createTodo(w http.ResponseWriter, r *http.Request){
+	var t todo
+	if err := json.NewDecoder(r.Body).Decode(&t){
+		rnd.JSON(w, http.StatusProcessing, err)
+	}
+
+	if t.Title == ""{
+		rnd.JSON(w, http.StatusBadRequest, renderer.M{
+			"message":"The title is required.",
+		})
+		return
+	}
+	tm := todoModel{
+		ID: bson.NewObjectId(),
+		Title: t.Title,
+		Completed: false,
+		CreatedAt: time.Now(),
+	}
+	if err:=db.C(collectionName).Insert(&tm); err != nil {
+		rnd.JSON(w, http.StatusProcessing, renderer.M{
+			"message":"Failed to save todo",
+			"error":err,
+		})
+		return
+	}
+	rnd.JSON(w, httpStatusCreated, renderer.M{
+		"message":"todo created successfully",
+		"todo_id":tm.ID.Hex(),
+	})
+}
+
+func deleteTodo(w http.ResponseWriter, r *http.Request){
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if !bson.IsObjectIdHex(id){
+		rnd.JSON(w, http.StatusBadRequest, renderer.M{
+			"message":"The id is invalid",
+		})
+		if err:= db.C(collectionName).RemoveId(bson.ObjectIdHex(id)): err != nil{
+			end.JSON(w, http.StatusProcessing, renderer.M{
+				"message":"Failed to delete todo",
+				"error":err,
+			})
+			return
+		}
+	}
+	rnd.JSON(w, http.StatusOk, renderer.M{
+		"message":"todo deleted successfully",
+	})
 }
 
 func main(){
